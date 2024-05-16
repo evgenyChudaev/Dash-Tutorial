@@ -1,305 +1,141 @@
 # For data manipulation, visualization, app
 from dash import Dash, dcc, html, callback,Input, Output,dash_table
-import dash_bootstrap_components as dbc
+import plotly
 import plotly.express as px
 import pandas as pd
 import os 
 import numpy as np
-
-# For modeling
-from sklearn.metrics import confusion_matrix
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-
-
-# loading Datasets
-base_path = os.path.dirname(__file__)
-file_name = 'heart_failure_clinical_records_dataset,predictions.csv'
-feature_name = 'feature_importance.csv'
-total_path = base_path + '//Data//' 
-df1 = pd.read_csv(total_path + file_name)
-feature_importance = pd.read_csv(total_path + feature_name).sort_values(by = ['Importance'], 
-                                                                                             ascending=False)
-
-def filter_dataframe(input_df, var1, var2, var3):
-
-    bp_list, sex_list,anaemia_list  = [], [], []
-    # Filtering for blood pressure
-    if var1== "all_values":
-        bp_list = input_df['high_blood_pressure'].drop_duplicates()
-    else:
-        bp_list = [var1]
-    # Filtering for sex
-    if var2== "all_values":
-        sex_list = input_df['sex'].drop_duplicates()
-    else:
-        sex_list = [var2]
-    # Filtering for Anaemia
-    if var3== "all_values":
-        anaemia_list = input_df['anaemia'].drop_duplicates()
-    else:
-        anaemia_list = [var3]
-    # Applying filters to dataframe
-    input_df = input_df[(input_df['high_blood_pressure'].isin(bp_list)) &
-                              (input_df['sex'].isin(sex_list)) &
-                               (input_df['anaemia'].isin(anaemia_list))]
-    return input_df
-
-def draw_Text(input_text):
-
-    return html.Div([
-            dbc.Card(
-                dbc.CardBody([
-                        html.Div([
-                            html.H2(input_text),
-                        ], style={'textAlign': 'center'}) 
-                ])
-            ),
-        ])
-
-def draw_Image(input_figure):
-
-    return html.Div([
-            dbc.Card(
-                dbc.CardBody([
-                    dcc.Graph(figure=input_figure.update_layout(
-                            template='plotly_dark',
-                            plot_bgcolor= 'rgba(0, 0, 0, 0)',
-                            paper_bgcolor= 'rgba(0, 0, 0, 0)',
-                        )
-                    ) 
-                ])
-            ),  
-        ])
-
-# Returning model performance
-cmatrix = confusion_matrix(df1['DEATH_EVENT'], df1['Prediction'])
-
+import plotly.graph_objs as go
+from collections import deque
+from datetime import datetime, timedelta
+import dash
+# Create a Dash app
 # Building and Initializing the app
-dash_app = Dash(external_stylesheets=[dbc.themes.SLATE])
-app = dash_app.server
 
-# Defining component styles
-SIDEBAR_STYLE = {
-    "position": "fixed",
-    "top": 0,
-    "left": 0,
-    "bottom": 0,
-    "width": "18rem",
-    "padding": "2rem 1rem",
-    "background-color": "#f8f9fa",
-    "display":"inline-block"
-}
+# Create a Dash app
+app = dash.Dash(__name__)
 
-CONTENT_STYLE = {
-    "margin-left": "18rem",
-    "margin-right": "2rem",
-    "padding": "2rem 1rem",
-    "display":"inline-block",
-    "width": "100%"
-}
-FILTER_STYLE = {"width": "30%"}
+# Initialize data for the graph
+X = deque(maxlen=20)
+X.append(datetime.now())
+Y_values = [0.2,0.3, 0.2, 0.2, 0.5, 0.6, 0.9, 1.2, 1.1, 0.3, 7, 0.25, 0.31, 0.27, 0.21, 0.5, 1.3, 1.2, 1.5, 2, 1.7, 2, 0.9, 0.5]
+Y_values2 = [0.2,0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 6, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2,0.2, 0.2, 0.2, 0.2, 0.2, 0.2]
 
-# Defining components
-sidebar = html.Div(children = [
-            html.H2("Description", className="display-4"),
-            html.Hr(),
-            html.P(
-                "Tutorial project detailing how to develop a basic front end application exploring the factors influencing heart failure", className="lead"
-            ),
-            html.H3("Model"
-            ),
-            html.P(
-                "This project uses a Random Forest Classifier to predict heart failure based on 12 independent variables.", className="lead"
-            ),
+Y = deque(maxlen=20)
+Y.append(Y_values[datetime.now().hour])
 
-            html.H3("Code"
-            ),
-            html.P(
-                "The complete code for this project is available on github.", className="lead"
-            ),
-            html.A(
-                href="https://github.com/pinstripezebra/Dash-Tutorial",
-                children=[
-                    html.Img(
-                        alt="Link to Github",
-                        src="github_logo.png",
-                    )
-                ],
-                style = {'color':'black'}
-            )
+# Define the layout
+app.layout = html.Div([
+    # Add the company logo (center-aligned with a red border)
+    html.Div(
+        [
+            html.Img(src=app.get_asset_url('nspi_logo_original.jpeg'), height='80px', style={'display': 'block', 'margin': 'auto'}),            
+            html.H2("Your Hourly Energy Usage App", style={'text-align': 'center', 'margin-top': '10px'})
+        ],
+        style={'text-align': 'center'}
+    ),
 
-        ], style=SIDEBAR_STYLE
-    )
+    # Add a label and dropdown
+    html.Label('Select your property', style={'font-weight': 'bold'}),
+    dcc.Dropdown(
+        id='property-dropdown',
+        options=[
+            {'label': 'Property - Primary', 'value': 'Property 123456'},
+            {'label': 'Property - Cottage', 'value': 'Property 654321'}
+        ],
+        value='Property 123456'
+    ),
 
-filters = html.Div([
-            dbc.Row([
-                html.Div(children= [
-                html.H1('Heart Failure Prediction'),
-                dcc.Markdown('A comprehensive tool for examining factors impacting heart failure'),
+    # Add the live graph
+    dcc.Graph(id='live-graph', animate=True),
+    dcc.Interval(id='graph-update', interval=1000, n_intervals=0),
 
-                html.Label('Blood Pressure'),
-                dcc.Dropdown(
-                    id = 'BP-Filter',
-                    options = [{"label": i, "value": i} for i in df1['high_blood_pressure'].drop_duplicates()] + 
-                                [{"label": "Select All", "value": "all_values"}],
-                    value = "all_values"),
+    # Add a PAUSE button
+    html.Button('Pause', id='pause-button', n_clicks=0),
 
-                html.Label('Sex'),
-                dcc.Dropdown(
-                    id = 'Sex-Filter',
-                    options = [{"label": i, "value": i} for i in df1['sex'].drop_duplicates()] + 
-                                [{"label": "Select All", "value": "all_values"}],
-                    value = "all_values"),
-
-                html.Label('Anaemia'),
-                dcc.Dropdown(
-                    id = 'Anaemia-Filter',
-                    options = [{"label": i, "value": i} for i in df1['anaemia'].drop_duplicates()] + 
-                                [{"label": "Select All", "value": "all_values"}],
-                    value = "all_values")])
-             ])
-], style = FILTER_STYLE)
-
-sources = html.Div([
-                html.H3('Data Sources:'),
-                html.Div([
-                    html.Div(children = [
-                        html.Div([
-                            dcc.Markdown("""Data Description: This dataset contains 12 features that 
-                                         can be used to predict mortality by heart failure with each row representing 
-                                         a separate patient, the response variable is DEATH_EVENT.""")
-                        ]),
-                        html.Div([
-                            html.A("Dataset available on Kaggle", 
-                                   href='https://www.kaggle.com/datasets/andrewmvd/heart-failure-clinical-data?select=heart_failure_clinical_records_dataset.csv', target="_blank")
-                        ], style={'display': 'inline-block'})
-                    ]),
-
-                html.H3('Citation'),
-                dcc.Markdown(
-                """Davide Chicco, Giuseppe Jurman: Machine learning can predict survival 
-                of patients with heart failure from serum creatinine and ejection fraction alone. 
-                BMC Medical Informatics and Decision Making 20, 16 (2020)""")
-                ])
-             ])
-
-dash_app.layout = html.Div(children = [
-    sidebar,
-     html.Div([
-        filters,
-        html.Div([
-            dbc.Card(
-                dbc.CardBody([
-                    dbc.Row(id = 'kpi-Row'), 
-                    html.Br(),
-                    dbc.Row(id = 'EDA-Row'),
-                    html.Br(),
-                    dbc.Row(id = 'ML-Row'), 
-                    sources     
-                ]), color = 'dark'
-            )
-        ])
-    ],style = CONTENT_STYLE)
+    # Add a notification div
+    html.Div(id='notification-div', style={'background-color': 'red', 'color': 'white', 'text-align': 'center', 'font-size': '40px'})
 ])
 
-# callback for top row
-@callback(
-    Output(component_id='EDA-Row', component_property='children'),
-    [Input('BP-Filter', 'value'),
-     Input('Sex-Filter', 'value'),
-     Input('Anaemia-Filter', 'value')]
-)
-def update_output_div(bp, sex, anaemia):
+# Callback to update the graph
+@app.callback(Output('live-graph', 'figure'), [Input('graph-update', 'n_intervals'), Input('pause-button', 'n_clicks'), Input('property-dropdown', 'value')])
+def update_graph_scatter(n, n_clicks, selected_property):
+    global X, Y
+    if n_clicks % 2 == 0:  # If the number of button clicks is even, update the graph
+        current_time = X[-1] + timedelta(hours=1)
+        X.append(current_time)
+        if selected_property == 'Property 123456':
+            Y.append(Y_values[current_time.hour])
+        else:
+            Y.append(Y_values2[current_time.hour])
 
-    #Making copy of DF and filtering
-    filtered_df = df1
-    filtered_df = filter_dataframe(filtered_df, bp, sex, anaemia)
+        data = plotly.graph_objs.Scatter(
+            x=list(X),
+            y=list(Y),
+            name='Scatter',
+            mode='lines+markers'
+        )
 
-    #Creating figures
-    factor_fig = px.histogram(filtered_df, x= 'age', facet_col="diabetes", color = 'DEATH_EVENT', 
-                              title = "Age and Diabetes vs. Death")
-    age_fig = px.scatter(filtered_df, x="ejection_fraction", y="serum_creatinine", facet_col="high_blood_pressure",
-                         color = "DEATH_EVENT", 
-                         title = "Ejection Fraction and Creatinine vs. Death")
-    time_fig = px.scatter(filtered_df, x = 'time', y = 'platelets', color = 'DEATH_EVENT',
-                              title = 'Time and Platelets vs Death')
+        layout = go.Layout(
+            xaxis=dict(title='Time (Hour of the Day)'),  # X-axis label
+            yaxis=dict(title='Kw/hr'),  # Y-axis label
+            xaxis_range=[min(X), max(X)],
+            yaxis_range=[min(Y), max(Y)]
+        )
 
-    return dbc.Row([
-                dbc.Col([
-                    draw_Image(factor_fig)
-                ], width={"size": 3, "offset": 0}),
-                dbc.Col([
-                    draw_Image(age_fig)
-                ],width={"size": 3}),
-                dbc.Col([
-                    draw_Image(time_fig)
-                ], width={"size": 3}),
-            ])
+        if Y[-1] > 5:
+            layout.shapes = [
+                dict(
+                    type='line',
+                    yref='y', y0=0, y1=1,
+                    xref='x', x0=current_time, x1=current_time,
+                    line=dict(
+                        color='Red',
+                        width=1
+                    )
+                )
+            ]
+            layout.annotations = [
+                dict(
+                    x=current_time,
+                    y=0.95,
+                    xref='x',
+                    yref='paper',
+                    text='OUTLIER',
+                    showarrow=False,
+                    font=dict(
+                        color='White',
+                        size=16
+                    ),
+                    bgcolor='Red'
+                )
+            ]
 
+        return {'data': [data], 'layout': layout}
+    else:  # If the number of button clicks is odd, don't update the graph
+        raise dash.exceptions.PreventUpdate
 
-# callback for second row
-@callback(
-    Output(component_id='ML-Row', component_property='children'),
-    Input('Sex-Filter', 'value')
-)
-def update_model(value):
+# Callback to reset the graph when a new dropdown value is selected
+@app.callback(Output('graph-update', 'n_intervals'), [Input('property-dropdown', 'value')])
+def reset_graph(selected_property):
+    global X, Y
+    X = deque(maxlen=20)
+    X.append(datetime.now())
+    if selected_property == 'Property 123456':
+        Y = deque(Y_values, maxlen=20)
+    else:
+        Y = deque(Y_values2, maxlen=20)
+    return 0
 
-    # Making copy of df
-    confusion = cmatrix
-    #x_copy = X_cols
-    f_importance = feature_importance
-
-    # Aggregating confusion dataframe and plotting
-    confusion_fig = px.imshow(confusion, 
-                              labels=dict(x="Predicted Value", 
-                                y="True Value", color="Prediction"),
-                                aspect="auto",
-                                text_auto=True,
-                                title = "Confusion Matrix - Predicted vs Actual Values")
-    
-    # Graphing feature importance
-    feature_fig =  px.bar(f_importance, x='Feature Name', y='Importance',
-                          title = 'Feature Importance')
-
-    return dbc.Row([
-                dbc.Col([
-                    draw_Image(feature_fig)
-                ], width={"size": 5}),
-                dbc.Col([
-                    draw_Image(confusion_fig)
-                ],width={"size": 3})
-            ])
-
-# callback for kpi row
-@callback(
-    Output(component_id='kpi-Row', component_property='children'),
-    [Input('BP-Filter', 'value'),
-     Input('Sex-Filter', 'value'),
-     Input('Anaemia-Filter', 'value')]
-)
-def update_kpi(bp, sex, anaemia):
-
-    # Copying and filtering dataframe
-    filtered_df = df1
-    filtered_df = filter_dataframe(filtered_df, bp, sex, anaemia)
-
-    observation_count = filtered_df.shape[0]
-    death_count = filtered_df[filtered_df['DEATH_EVENT']==1].shape[0]
-    no_death_count = filtered_df[filtered_df['DEATH_EVENT']==0].shape[0]
-    
-    return dbc.Row([
-                        dbc.Col([
-                                draw_Text("Observations: " + str(observation_count))
-                        ], width=3),
-                        dbc.Col([
-                            draw_Text("Death Count: " + str(death_count))
-                        ], width=3),
-                        dbc.Col([
-                            draw_Text("Survival Count: " + str(no_death_count))
-                        ], width=3),
-                    ])
-
-# Runing the app
+# Callback to update the notification div
+@app.callback(Output('notification-div', 'children'), [Input('graph-update', 'n_intervals')])
+def update_notification_div(value):
+    if Y[-2] >5 or Y[-1] > 5 or Y[-3] > 5:    
+        
+        return "Unusually high energy consumption detected. Please check your appliances."
+        
+    else:
+        return ""
+ 
 if __name__ == '__main__':
-    dash_app.run_server(debug=False)
+    app.run_server()
